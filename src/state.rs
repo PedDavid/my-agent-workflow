@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::{Hook, Signal, Source};
 use crate::model::{Agent, AgentKind, Status, WindowRef};
-use crate::wm::{WmEvent, id_from_class};
+use crate::wm::{Client, WmEvent, id_from_class};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Change {
@@ -313,6 +313,71 @@ impl Store {
         }
     }
 
+    /// Resynchronise with the compositor's client list (startup, socket2 reconnect).
+    /// Agents whose window is gone become Exited, except ones still starting
+    /// (spawned less than `grace_ms` ago); unknown `drove-*` windows are adopted.
+    pub fn reconcile(&mut self, clients: &[Client], now: u64, grace_ms: u64) -> Vec<Change> {
+        let mut out = vec![];
+        if let Some(c) = clients.iter().find(|c| c.focus_history_id == 0) {
+            self.focused = Some(c.address.clone());
+        }
+        let ids: Vec<String> = self.agents.keys().cloned().collect();
+        for id in ids {
+            let a = self.agents.get_mut(&id).unwrap();
+            let class = crate::wm::agent_class(&id);
+            let found = clients
+                .iter()
+                .find(|c| c.class == class || c.initial_class == class)
+                .or_else(|| {
+                    let addr = &a.window.as_ref()?.address;
+                    clients.iter().find(|c| &c.address == addr)
+                });
+            let before = a.clone();
+            match found {
+                Some(c) => {
+                    a.window = Some(WindowRef {
+                        address: c.address.clone(),
+                        workspace: c.workspace.clone(),
+                        title: c.title.clone(),
+                        class: c.class.clone(),
+                    });
+                    if a.status == Status::Exited {
+                        a.status = Status::Idle;
+                    }
+                }
+                None => {
+                    let starting =
+                        a.status == Status::Starting && now.saturating_sub(a.created_at) < grace_ms;
+                    if !starting {
+                        a.window = None;
+                        a.status = Status::Exited;
+                        a.attention = false;
+                        a.maybe = false;
+                        a.pending_tool_since = None;
+                    }
+                }
+            }
+            if *a != before {
+                a.updated_at = now;
+                out.push(Change::Updated(id));
+            }
+        }
+        for c in clients {
+            if id_from_class(&c.class).is_some_and(|id| !self.agents.contains_key(id)) {
+                out.extend(self.apply_wm(
+                    &WmEvent::OpenWindow {
+                        address: c.address.clone(),
+                        workspace: c.workspace.clone(),
+                        class: c.class.clone(),
+                        title: c.title.clone(),
+                    },
+                    now,
+                ));
+            }
+        }
+        out
+    }
+
     /// Periodic housekeeping: the kiro stale-tool heuristic.
     pub fn tick(&mut self, now: u64) -> Vec<Change> {
         let mut out = vec![];
@@ -336,10 +401,14 @@ impl Store {
     }
 
     /// Which agent `drove next` should jump to: NeedsInput, then idle with
-    /// attention, then anything with attention. The focused agent is skipped
-    /// unless it is the only candidate.
+    /// attention, then anything with attention (agents with a window only).
+    /// The focused agent is skipped unless it is the only candidate.
     pub fn next(&self) -> Option<String> {
-        let live = || self.agents.values().filter(|a| a.status != Status::Exited);
+        let live = || {
+            self.agents
+                .values()
+                .filter(|a| a.status != Status::Exited && a.window.is_some())
+        };
         let groups: [Vec<&Agent>; 3] = [
             live().filter(|a| a.status == Status::NeedsInput).collect(),
             live()
@@ -690,7 +759,12 @@ mod tests {
     fn next_priority() {
         let mut s = Store::new(1);
         for (i, id) in ["aaaaaa", "bbbbbb", "cccccc", "dddddd"].iter().enumerate() {
-            s.insert(Agent::new(id, id, AgentKind::Claude, "", "", i as u64));
+            let mut a = Agent::new(id, id, AgentKind::Claude, "", "", i as u64);
+            a.window = Some(WindowRef {
+                address: format!("0x{id}"),
+                ..Default::default()
+            });
+            s.insert(a);
         }
         assert_eq!(s.next(), None);
         let a = s.agents.get_mut("aaaaaa").unwrap();
@@ -756,5 +830,47 @@ mod tests {
         assert_eq!(s.forget_exited(), vec![Change::Removed("bbbbbb".into())]);
         assert_eq!(s.forget("aaaaaa").len(), 1);
         assert!(s.forget("aaaaaa").is_empty());
+    }
+    #[test]
+    fn reconcile_with_clients() {
+        let mut s = Store::new(1);
+        s.insert(Agent::new("aaaaaa", "a", AgentKind::Claude, "", "", 0));
+        s.insert(Agent::new("bbbbbb", "b", AgentKind::Claude, "", "", 0));
+        s.insert(Agent::new("cccccc", "c", AgentKind::Claude, "", "", 95));
+        s.agents.get_mut("bbbbbb").unwrap().status = Status::Working;
+        let clients = vec![
+            Client {
+                address: "0xa".into(),
+                class: "drove-aaaaaa".into(),
+                initial_class: "drove-aaaaaa".into(),
+                title: "ta".into(),
+                pid: 1,
+                workspace: "2".into(),
+                focus_history_id: 0,
+            },
+            Client {
+                address: "0xd".into(),
+                class: "drove-dddddd".into(),
+                title: "td".into(),
+                focus_history_id: 1,
+                ..Default::default()
+            },
+            Client {
+                address: "0xe".into(),
+                class: "firefox".into(),
+                focus_history_id: 2,
+                ..Default::default()
+            },
+        ];
+        let ch = s.reconcile(&clients, 100, 30);
+        assert_eq!(ch.len(), 3);
+        assert_eq!(s.focused.as_deref(), Some("0xa"));
+        let a = s.get("aaaaaa").unwrap();
+        assert_eq!(a.window.as_ref().unwrap().workspace, "2");
+        assert_eq!(a.status, Status::Starting);
+        assert_eq!(s.get("bbbbbb").unwrap().status, Status::Exited);
+        assert_eq!(s.get("cccccc").unwrap().status, Status::Starting, "grace");
+        assert!(s.get("dddddd").unwrap().adopted);
+        assert!(s.reconcile(&clients, 101, 30).is_empty());
     }
 }
