@@ -5,4 +5,7 @@ version.workspace = true
 license.workspace = true
 
 [dependencies]
+crossterm = "0.29.0"
 drove-client.workspace = true
+ratatui = "0.30.2"
+serde_json.workspace = true
