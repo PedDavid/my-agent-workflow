@@ -154,7 +154,11 @@ pub fn new_id() -> String {
 
 /// First line of `s`, trimmed and truncated to `max` chars.
 pub fn snippet(s: &str, max: usize) -> String {
-    let line = s.lines().find(|l| !l.trim().is_empty()).unwrap_or("").trim();
+    let line = s
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or("")
+        .trim();
     if line.chars().count() > max {
         let mut out: String = line.chars().take(max.saturating_sub(1)).collect();
         out.push('…');
@@ -172,7 +176,10 @@ mod tests {
     fn id_shape() {
         let id = new_id();
         assert_eq!(id.len(), 6);
-        assert!(id.chars().all(|c| c.is_ascii_lowercase() || ('2'..='7').contains(&c)));
+        assert!(
+            id.chars()
+                .all(|c| c.is_ascii_lowercase() || ('2'..='7').contains(&c))
+        );
     }
 
     #[test]
@@ -184,6 +191,9 @@ mod tests {
 
     #[test]
     fn status_serde() {
-        assert_eq!(serde_json::to_string(&Status::NeedsInput).unwrap(), "\"needs_input\"");
+        assert_eq!(
+            serde_json::to_string(&Status::NeedsInput).unwrap(),
+            "\"needs_input\""
+        );
     }
 }

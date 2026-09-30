@@ -1,3 +1,1 @@
-fn main() {
-    std::process::exit(drove::cli::run());
-}
+fn main() {}
