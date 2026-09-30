@@ -177,3 +177,51 @@ agent hooks ──► drove hook <src> ──(unix socket, fire-and-forget)─�
 - Small commits, pushed to `claude/intelligent-wozniak-1pb9fe` as you go.
 - Dependencies: keep lean — tokio, serde, serde_json, clap (derive), toml, anyhow, thiserror (optional), tracing + tracing-subscriber. No chrono, no reqwest.
 - README.md: what it is, install, config, hyprland.lua snippet, hooks setup per agent, protocol for UI authors, **manual smoke-test checklist for the user to run on their real machine**.
+
+## Phase 2 — screen detection + agents started by hand (must-have)
+
+Decided after reviewing PR #1 and herdr's implementation. Owner: the implementation chat (touches `src/`).
+
+### 2a. Screen-state detection (herdr-compatible manifests)
+herdr (Apache-2.0, `src/detect/`) classifies agent state from the live bottom-of-screen text using per-agent
+TOML manifests (`src/detect/manifests/{claude,codex,kiro,…}.toml`): prioritized rules with
+`state = idle|working|blocked`, a `region` (`bottom_non_empty_lines(N)`, `whole_recent`, `osc_title`,
+`osc_progress`), and matchers `contains` / `regex` / `line_regex` combinable with `any` / `all`, plus flags
+`visible_idle` / `visible_working` / `visible_blocker`. Kiro example rules: idle =
+`^\s*[>›]\s*ask a question or describe a task`, working footer `kiro is working` / `type to steer`, blocked =
+approval menu (`allow` / `always allow` / `deny` … + `esc to close … to navigate`), `requires approval`, question panels.
+
+- Implement a small rule engine that loads the **same manifest format** (vendor claude/codex/kiro manifests from
+  herdr with attribution + license notice in `third_party/herdr/`; allow user overrides in `~/.config/drove/detect/*.toml`).
+  Support at least regions `bottom_non_empty_lines(N)`, `whole_recent`, `osc_title` (= kitty window title from
+  `kitten @ ls`); ignore `osc_progress` for now. Unit-test with screen fixtures (copy herdr's test fixtures for these agents if present).
+- Probe loop in the daemon: every ~1s (config), for agents with a kitty handle **and** (kind == kiro, or status
+  working/needs_input, or adopted without hooks), `kitten @ get-text --extent screen` (+ title from ls), classify.
+- Arbitration: hooks stay authoritative for claude/codex idle/working/turn-done; a screen `visible_blocker` may
+  raise `needs_input` (sets `maybe = false` because it's visible); for kiro, screen state is primary and the
+  stale-tool timer becomes a fallback only when no manifest rule matches. Screen `idle` after a blocker clears it.
+- Keep it cheap: skip probing agents whose window is not mapped; back off when the text hash is unchanged.
+
+### 2b. Agents started by hand
+PR #1 adopts on the first hook (ancestor PIDs → Hyprland client pid). Close the remaining gaps:
+- **Global hook install for Claude**: `drove hooks install claude` merges into `~/.claude/settings.json` (backup,
+  idempotent), like codex/kiro. When global hooks are installed, `spawn` must not also inject `--settings`
+  (or the hook must dedupe) — no double events.
+- **Hook-less discovery**: on start and on `openwindow`, and every ~5s, walk `/proc` children of each Hyprland
+  client pid; any process whose argv[0] basename is a known agent (`claude`, `codex`, `kiro-cli`, `kiro`,
+  configurable) → adopted agent (status `starting`, `adopted = true`, name from cwd basename). Dedupe with hook
+  adoption by pid. Mark `exited` when the process disappears.
+- **Terminal handle for adopted agents**: if the user's kitty runs with remote control (`allow_remote_control
+  socket-only` + `listen_on unix:@kitty-{kitty_pid}` — document this in README), find the socket for the kitty pid
+  and the kitty window whose `pid`/`foreground_processes` contains the agent pid → `term = Kitty{socket, window_id}`.
+  That enables `send`/`text` and screen detection for hand-started agents. Without it, adopted agents still get
+  hooks + focus.
+- vm-drove test additions: start `claude` by hand inside a plain `kitty` (with the remote-control config) →
+  appears in `ls` with `adopted: true`, status follows hooks; kiro started by hand shows `needs_input` from the
+  approval screen (extend `nix/fake-agents.nix` so fake kiro prints the real approval menu text from herdr's fixtures).
+
+## Front-ends (handed to separate agents)
+All UIs consume only the socket protocol — spec in `docs/protocol.md`, shared Rust client in `ui/client`,
+and `tools/mock-drove.py` for development without Hyprland. Each lives in its own directory:
+`ui/tui` (ratatui dashboard), `ui/web` (local web dashboard), `ui/notify` (desktop notifications with
+click-to-focus), `ui/quickshell` (Quickshell bar widget/panel).

@@ -1,0 +1,10 @@
+[package]
+name = "drove-client"
+description = "Types and a blocking client for the drove daemon protocol"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true

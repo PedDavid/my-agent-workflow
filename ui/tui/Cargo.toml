@@ -1,0 +1,8 @@
+[package]
+name = "drove-tui"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+drove-client.workspace = true
