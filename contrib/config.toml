@@ -1,0 +1,40 @@
+# ~/.config/drove/config.toml — every key is optional; values shown are the defaults
+# unless marked "example".
+
+[terminal]
+kind = "kitty"
+mode = "standalone"          # or "instance": windows inside one kitty (needs `socket`)
+kitty = "kitty"
+kitten = "kitten"
+# socket = "unix:@mykitty"   # instance mode: kitty started with --listen-on unix:@mykitty
+# extra_args = ["-o", "font_size=11"]
+
+[hyprland]
+hyprctl = "hyprctl"
+dispatch = "auto"            # "lua" | "legacy" | "auto" (probe with hl.dsp.no_op())
+
+[picker]
+command = ["fuzzel", "--dmenu"]   # e.g. ["wofi", "--dmenu"], ["rofi", "-dmenu"]
+
+[spawn]
+workspace = ""               # example: "special:agents" or "3 silent"
+worktree_root = "{repo}/../{repo_name}.worktrees/{branch}"
+
+[kiro]
+stale_tool_secs = 4          # preToolUse without postToolUse this long => needs input (maybe)
+
+[hooks]
+# drove = "/home/me/.cargo/bin/drove"   # binary written into hook commands (default: this exe)
+adopt = true                 # track agents started by hand, via their window's PID
+
+# Built-in profiles: claude, codex, kiro, shell. Override or add your own:
+# [agents.opus]
+# kind = "claude"
+# command = ["claude", "--model", "opus"]
+# workspace = "4 silent"
+# env = { ANTHROPIC_LOG = "info" }
+#
+# [agents.codex]
+# kind = "codex"
+# command = ["codex"]
+# inject = true              # add -c notify=[drove hook codex-notify]

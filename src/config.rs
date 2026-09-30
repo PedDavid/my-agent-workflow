@@ -286,4 +286,9 @@ mod tests {
     fn unknown_keys_are_rejected() {
         assert!(Config::parse("[terminal]\nmoed = \"x\"").is_err());
     }
+    #[test]
+    fn contrib_config_parses() {
+        let c = Config::parse(include_str!("../contrib/config.toml")).unwrap();
+        assert_eq!(c.terminal.mode, TerminalMode::Standalone);
+    }
 }
