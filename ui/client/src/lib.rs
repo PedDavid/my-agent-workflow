@@ -339,13 +339,19 @@ impl Iterator for Subscription {
 /// Run forever: subscribe, feed events to `on_event`, reconnect with backoff
 /// (0.5s → 5s) whenever the daemon is down. `on_disconnect` lets UIs show a
 /// "daemon not running" state. Returns only if a callback returns `false`.
-pub fn follow(
+pub fn follow(on_event: impl FnMut(Event) -> bool, on_disconnect: impl FnMut(&Error) -> bool) {
+    follow_at(&socket_path(), on_event, on_disconnect)
+}
+
+/// [`follow`] against an explicit socket path (for `--socket` flags and tests).
+pub fn follow_at(
+    path: &std::path::Path,
     mut on_event: impl FnMut(Event) -> bool,
     mut on_disconnect: impl FnMut(&Error) -> bool,
 ) {
     let mut backoff = Duration::from_millis(500);
     loop {
-        match Subscription::open() {
+        match Subscription::open_at(path) {
             Ok(sub) => {
                 backoff = Duration::from_millis(500);
                 for ev in sub {
