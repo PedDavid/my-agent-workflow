@@ -289,6 +289,11 @@ looks wrong.
 * **Reconcile** runs at startup and on every socket2 reconnect. An agent still
   `starting` within 60 s of its spawn isn't marked exited, so a slow window start
   survives it.
+* **PATH.** Agent windows are started by Hyprland (`exec_cmd`), so `claude`, `codex`
+  and `kiro-cli` must be on *Hyprland's* PATH. If they aren't, put absolute paths in the
+  profiles' `command`.
+* **Codex without `hooks.json`** stays `starting` until its first turn finishes, because
+  notify only reports finished turns.
 * **Not under Hyprland**, spawn falls back to a detached `setsid` process, and focus and
   close report an error.
 * **Seams kept for later:** agent identity is `DROVE_AGENT_ID`, never the window.
