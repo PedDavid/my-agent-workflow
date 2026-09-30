@@ -48,6 +48,9 @@
         # End-to-end acceptance test for drove against real Hyprland + kitty,
         # with scripted fake claude/codex/kiro-cli agents that fire real hooks.
         vm-drove = import ./nix/vm-drove.nix { inherit pkgs drove fakeAgents; };
+
+        # Quickshell widget/panel (ui/quickshell) against tools/mock-drove.py.
+        vm-quickshell = import ./nix/vm-quickshell.nix { inherit pkgs; };
       };
     };
 }
