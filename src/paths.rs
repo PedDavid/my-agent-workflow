@@ -7,7 +7,9 @@ fn env(name: &str) -> Option<String> {
 }
 
 pub fn home() -> PathBuf {
-    env("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/"))
+    env("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/"))
 }
 
 /// `$XDG_RUNTIME_DIR/drove`, falling back to `/tmp/drove-<uid>`.
@@ -67,7 +69,12 @@ pub fn config_path() -> PathBuf {
 pub fn hypr_socket2() -> Option<PathBuf> {
     let sig = env("HYPRLAND_INSTANCE_SIGNATURE")?;
     let rt = env("XDG_RUNTIME_DIR")?;
-    Some(PathBuf::from(rt).join("hypr").join(sig).join(".socket2.sock"))
+    Some(
+        PathBuf::from(rt)
+            .join("hypr")
+            .join(sig)
+            .join(".socket2.sock"),
+    )
 }
 
 pub fn under_hyprland() -> bool {

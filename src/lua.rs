@@ -72,8 +72,8 @@ mod tests {
         assert_eq!(lua_str("a\"b"), "\"a\\\"b\"");
         assert_eq!(lua_str("a\\b"), "\"a\\\\b\"");
         assert_eq!(lua_str("a\nb\rc"), "\"a\\nb\\rc\"");
-        assert_eq!(lua_str("a\0" ), "\"a\\000\"");
-        assert_eq!(lua_str("\x01" ), "\"\\001\"");
+        assert_eq!(lua_str("a\0"), "\"a\\000\"");
+        assert_eq!(lua_str("\x01"), "\"\\001\"");
         assert_eq!(lua_str("é"), "\"é\"");
     }
 

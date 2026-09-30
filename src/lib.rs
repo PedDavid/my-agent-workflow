@@ -11,8 +11,10 @@ pub mod model;
 pub mod paths;
 pub mod protocol;
 pub mod shell;
+pub mod spawn;
 pub mod state;
 pub mod term;
+pub mod ui;
 pub mod wm;
 
 /// Current unix time in milliseconds.

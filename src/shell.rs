@@ -36,7 +36,10 @@ mod tests {
     #[test]
     fn plain_words_are_untouched() {
         assert_eq!(quote("kitty"), "kitty");
-        assert_eq!(quote("unix:/run/user/1000/x.sock"), "unix:/run/user/1000/x.sock");
+        assert_eq!(
+            quote("unix:/run/user/1000/x.sock"),
+            "unix:/run/user/1000/x.sock"
+        );
         assert_eq!(quote("A=b"), "A=b");
     }
 

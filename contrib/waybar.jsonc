@@ -1,0 +1,16 @@
+// Waybar custom module. Add "custom/drove" to modules-left/center/right.
+"custom/drove": {
+    "exec": "drove bar",
+    "return-type": "json",
+    "restart-interval": 5,
+    "format": "{}",
+    "tooltip": true,
+    "on-click": "drove pick",
+    "on-click-right": "drove next"
+}
+
+// style.css:
+// #custom-drove.needs-input { color: #f38ba8; }
+// #custom-drove.working     { color: #f9e2af; }
+// #custom-drove.idle        { color: #a6e3a1; }
+// #custom-drove.none        { opacity: 0.5; }

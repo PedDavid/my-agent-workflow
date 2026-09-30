@@ -1,0 +1,17 @@
+# systemd user unit: cp contrib/drove.service ~/.config/systemd/user/
+# then: systemctl --user enable --now drove.service
+# (Hyprland must export its environment: e.g. `hl.exec_cmd("systemctl --user import-environment HYPRLAND_INSTANCE_SIGNATURE WAYLAND_DISPLAY")`
+#  or use uwsm, which does this for you.)
+[Unit]
+Description=drove agent daemon
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.cargo/bin/drove daemon
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
