@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>drove</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%234c8dff'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f5f6f8; --card: #fff; --fg: #1c2027; --dim: #6a7280; --line: #dde0e6;
+  --accent: #2f6fe4; --red: #d23b3b; --green: #2a8a4a; --amber: #b7791f; --gray: #8a919d;
+  --attn: #fff6df; --shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a; --card: #1e2127; --fg: #e4e7ec; --dim: #8b93a1; --line: #2e333b;
+    --accent: #6ea0ff; --red: #ff6b6b; --green: #5fd07f; --amber: #f0b04a; --gray: #7a8190;
+    --attn: #2d2816; --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header {
+  position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line);
+  padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+}
+h1 { font-size: 18px; margin: 0; letter-spacing: .02em; }
+.counts { display: flex; gap: 10px; flex-wrap: wrap; color: var(--dim); font-size: 13px; }
+.counts b { color: var(--fg); }
+.counts .needs b { color: var(--red); }
+.spacer { flex: 1; }
+button {
+  font: inherit; font-size: 13px; color: var(--fg); background: var(--card); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 10px; cursor: pointer; min-height: 30px;
+}
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger:hover { border-color: var(--red); color: var(--red); }
+button:disabled { opacity: .5; cursor: default; }
+#banner {
+  display: none; background: var(--red); color: #fff; padding: 8px 16px; font-weight: 600; font-size: 14px;
+}
+#banner.show { display: block; }
+main { padding: 12px 16px 40px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); align-items: start; }
+.empty { grid-column: 1 / -1; color: var(--dim); text-align: center; padding: 40px 0; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--gray);
+  border-radius: 8px; box-shadow: var(--shadow); padding: 10px 12px; cursor: pointer; min-width: 0;
+}
+.card:hover { border-color: var(--accent); }
+.card.attention { background: var(--attn); }
+.card.s-needs_input { border-left-color: var(--red); }
+.card.s-working { border-left-color: var(--accent); }
+.card.s-idle { border-left-color: var(--green); }
+.card.s-starting { border-left-color: var(--amber); }
+.card.s-exited { border-left-color: var(--gray); opacity: .65; }
+.row1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.glyph { font-size: 18px; width: 22px; text-align: center; flex: none; font-weight: 700; }
+.s-needs_input .glyph { color: var(--red); } .s-working .glyph { color: var(--accent); }
+.s-idle .glyph { color: var(--green); } .s-starting .glyph { color: var(--amber); } .s-exited .glyph { color: var(--gray); }
+.s-working .glyph { display: inline-block; animation: spin 2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .s-working .glyph { animation: none; } }
+.name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge { font-size: 11px; border: 1px solid var(--line); color: var(--dim); border-radius: 10px; padding: 0 7px; white-space: nowrap; }
+.badge.attn { border-color: var(--amber); color: var(--amber); }
+.status { margin-left: auto; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.meta { color: var(--dim); font-size: 12px; margin-top: 4px; display: flex; gap: 4px 12px; flex-wrap: wrap; }
+.meta .cwd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; direction: rtl; text-align: left; }
+.detail { margin-top: 4px; font-size: 13px; overflow-wrap: anywhere; }
+.detail:empty { display: none; }
+.actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.actions button { padding: 3px 8px; min-height: 28px; font-size: 12px; }
+.expand { margin-top: 8px; cursor: default; display: none; }
+.card.open .expand { display: block; }
+.expand pre {
+  margin: 0 0 8px; max-height: 260px; overflow: auto; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 8px; font: 12px/1.35 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.send { display: flex; gap: 6px; }
+.send input {
+  flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 5px 8px; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+}
+#toast {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: var(--fg); color: var(--bg);
+  padding: 8px 14px; border-radius: 8px; font-size: 14px; display: none; max-width: 90vw; z-index: 10;
+}
+#toast.show { display: block; }
+@media (max-width: 480px) {
+  main { grid-template-columns: 1fr; padding: 10px 16px 40px; }
+  header { padding: 8px 16px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>drove</h1>
+  <div class="counts" id="counts"></div>
+  <div class="spacer"></div>
+  <button class="primary" id="next" title="Focus the agent that needs you most">Next</button>
+  <button id="forget-exited" title="Forget all exited agents">Forget exited</button>
+</header>
+<div id="banner" role="alert">Daemon is not running &mdash; retrying&hellip; (showing last known state)</div>
+<main id="list"><div class="empty" id="empty">Connecting&hellip;</div></main>
+<div id="toast" role="status"></div>
+<script>
+"use strict";
+const GLYPH = { starting: "○", idle: "●", working: "◐", needs_input: "!", exited: "×" };
+const LABEL = { starting: "starting", idle: "idle", working: "working", needs_input: "needs input", exited: "exited" };
+const agents = new Map();      // id -> agent
+const cards = new Map();       // id -> {el, refs}
+const open = new Set();        // ids with the preview expanded
+let daemonUp = true, connected = false;
+const $ = (s) => document.querySelector(s);
+
+function priority(a) {
+  let r;
+  if (a.status === "needs_input") r = 0;
+  else if (a.status === "idle" && a.attention) r = 1;
+  else if (a.status === "working") r = 2;
+  else if (a.status === "idle") r = 3;
+  else if (a.status === "starting") r = 4;
+  else r = 5;
+  return [r, -(a.updated_at || 0)];
+}
+function sorted() {
+  return [...agents.values()].sort((a, b) => {
+    const p = priority(a), q = priority(b);
+    return p[0] - q[0] || p[1] - q[1];
+  });
+}
+function rel(ms) {
+  if (!ms) return "";
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (s < 5) return "just now";
+  if (s < 60) return s + "s ago";
+  if (s < 3600) return Math.floor(s / 60) + "m ago";
+  if (s < 86400) return Math.floor(s / 3600) + "h ago";
+  return Math.floor(s / 86400) + "d ago";
+}
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
+}
+async function api(method, path, body) {
+  try {
+    const r = await fetch(path, {
+      method,
+      headers: Object.assign({ "X-Drove": "1" }, body ? { "Content-Type": "application/json" } : {}),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { toast(j.error || ("HTTP " + r.status)); return null; }
+    return j;
+  } catch (e) { toast("request failed: " + e.message); return null; }
+}
+const aurl = (id, act) => "/api/agents/" + encodeURIComponent(id) + "/" + act;
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function btn(label, cls, fn) {
+  const b = el("button", cls, label);
+  b.addEventListener("click", (ev) => { ev.stopPropagation(); fn(b); });
+  return b;
+}
+function makeCard(id) {
+  const c = el("div", "card");
+  c.dataset.id = id;
+  c.tabIndex = 0;
+  const r = {};
+  const row = el("div", "row1");
+  r.glyph = el("span", "glyph"); r.name = el("span", "name");
+  r.guess = el("span", "badge", "(guess)"); r.adopted = el("span", "badge", "adopted");
+  r.attn = el("span", "badge attn", "attention");
+  r.status = el("span", "status");
+  row.append(r.glyph, r.name, r.attn, r.guess, r.adopted, r.status);
+  r.meta = el("div", "meta");
+  r.ws = el("span"); r.kind = el("span"); r.cwd = el("span", "cwd"); r.upd = el("span");
+  r.meta.append(r.ws, r.kind, r.upd, r.cwd);
+  r.detail = el("div", "detail");
+  const act = el("div", "actions");
+  act.append(
+    btn("Preview", "", () => togglePreview(id)),
+    btn("Rename", "", async () => {
+      const a = agents.get(id); const n = prompt("New name", a ? a.name : "");
+      if (n && n.trim()) await api("POST", aurl(id, "rename"), { name: n.trim() });
+    }),
+    btn("Close", "danger", async () => {
+      const a = agents.get(id);
+      if (confirm("Close " + (a ? a.name : id) + "? This closes its window.")) await api("POST", aurl(id, "close"));
+    }),
+    r.forget = btn("Forget", "", () => api("POST", aurl(id, "forget"))),
+  );
+  const ex = el("div", "expand");
+  ex.addEventListener("click", (e) => e.stopPropagation());
+  r.pre = el("pre", "", "");
+  const send = el("form", "send");
+  r.input = el("input"); r.input.placeholder = "Send prompt…"; r.input.autocomplete = "off";
+  r.input.setAttribute("aria-label", "Prompt to send");
+  const sb = el("button", "", "Send"); sb.type = "submit";
+  send.append(r.input, sb);
+  send.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = r.input.value;
+    if (!text) return;
+    const ok = await api("POST", aurl(id, "send"), { text, enter: true });
+    if (ok) r.input.value = "";
+  });
+  ex.append(r.pre, send);
+  c.append(row, r.meta, r.detail, act, ex);
+  c.addEventListener("click", async () => { await api("POST", aurl(id, "focus")); });
+  c.addEventListener("keydown", (e) => { if (e.target === c && e.key === "Enter") c.click(); });
+  cards.set(id, { el: c, r });
+  return c;
+}
+function updateCard(a) {
+  const { el: c, r } = cards.get(a.id);
+  c.className = "card s-" + a.status + (a.attention ? " attention" : "") + (open.has(a.id) ? " open" : "");
+  r.glyph.textContent = GLYPH[a.status] || "?";
+  r.name.textContent = a.name;
+  r.name.title = a.id;
+  r.guess.hidden = !a.maybe;
+  r.adopted.hidden = !a.adopted;
+  r.attn.hidden = !a.attention;
+  r.status.textContent = LABEL[a.status] || a.status;
+  r.ws.textContent = a.window ? "ws " + a.window.workspace : "no window";
+  r.kind.textContent = a.kind;
+  r.cwd.textContent = a.cwd ? "‎" + a.cwd : "";
+  r.cwd.title = a.cwd || "";
+  r.detail.textContent = a.detail || "";
+  r.upd.textContent = "updated " + rel(a.updated_at);
+  r.upd.dataset.t = a.updated_at || 0;
+  r.forget.hidden = a.status !== "exited";
+}
+function render() {
+  const list = $("#list");
+  const arr = sorted();
+  for (const id of [...cards.keys()]) if (!agents.has(id)) { cards.get(id).el.remove(); cards.delete(id); open.delete(id); }
+  let prev = null;
+  for (const a of arr) {
+    if (!cards.has(a.id)) makeCard(a.id);
+    updateCard(a);
+    const e = cards.get(a.id).el;
+    const want = prev ? prev.nextElementSibling : list.firstElementChild;
+    if (want !== e) list.insertBefore(e, want);
+    prev = e;
+  }
+  const empty = $("#empty");
+  empty.textContent = connected ? "No agents." : "Connecting…";
+  empty.hidden = arr.length > 0;
+  if (arr.length === 0) list.append(empty); else if (empty.parentNode) empty.remove();
+  header(arr);
+}
+function header(arr) {
+  const n = { needs: 0, working: 0, idle: 0, exited: 0, starting: 0 };
+  for (const a of arr) {
+    if (a.status === "needs_input" || (a.status === "idle" && a.attention)) n.needs++;
+    if (a.status === "working") n.working++;
+    else if (a.status === "idle") n.idle++;
+    else if (a.status === "exited") n.exited++;
+    else if (a.status === "starting") n.starting++;
+  }
+  const c = $("#counts");
+  c.textContent = "";
+  const add = (cls, num, label) => { const s = el("span", cls); s.append(el("b", "", String(num)), " " + label); c.append(s); };
+  add("needs", n.needs, "need you");
+  add("", n.working, "working");
+  add("", n.idle, "idle");
+  add("", n.exited, "exited");
+  document.title = (n.needs ? "(" + n.needs + "!) " : "") + "drove";
+  $("#forget-exited").disabled = n.exited === 0;
+  $("#banner").classList.toggle("show", !daemonUp);
+}
+function togglePreview(id) {
+  if (open.has(id)) open.delete(id); else { open.add(id); pollPreview(id); }
+  const a = agents.get(id); if (a) updateCard(a);
+}
+async function pollPreview(id) {
+  const cd = cards.get(id);
+  if (!cd || !open.has(id)) return;
+  try {
+    const r = await fetch(aurl(id, "text").replace(/\/text$/, "/text") + "?extent=screen");
+    const j = await r.json();
+    cd.r.pre.textContent = r.ok ? j.text : ("(" + (j.error || r.status) + ")");
+  } catch (e) { cd.r.pre.textContent = "(unavailable)"; }
+}
+setInterval(() => { for (const id of open) pollPreview(id); }, 2000);
+setInterval(() => {
+  for (const { r } of cards.values()) r.upd.textContent = "updated " + rel(Number(r.upd.dataset.t));
+}, 1000);
+
+$("#next").addEventListener("click", async () => {
+  const j = await api("POST", "/api/next");
+  if (j && !j.agent) toast("Nothing needs you right now");
+});
+$("#forget-exited").addEventListener("click", async () => {
+  const j = await api("POST", "/api/forget-exited");
+  if (j) toast("Forgot " + j.removed + " exited agent(s)");
+});
+
+function connect() {
+  const es = new EventSource("/events");
+  const on = (name, fn) => es.addEventListener(name, (e) => { try { fn(JSON.parse(e.data)); } catch (_) {} });
+  on("daemon", (d) => { daemonUp = !!d.up; render(); });
+  on("snapshot", (d) => { connected = true; agents.clear(); for (const a of d.agents) agents.set(a.id, a); render(); });
+  on("agent", (d) => { agents.set(d.agent.id, d.agent); render(); });
+  on("removed", (d) => { agents.delete(d.id); render(); });
+  es.onerror = () => { daemonUp = false; render(); };   // EventSource reconnects by itself
+  es.onopen = () => { daemonUp = true; render(); };
+}
+connect();
+render();
+</script>
+</body>
+</html>
