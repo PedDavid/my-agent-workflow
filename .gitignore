@@ -6,3 +6,6 @@ result-*
 # Added by cargo
 
 /target
+
+# agent worktrees (local only)
+.claude/worktrees/
