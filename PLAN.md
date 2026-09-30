@@ -44,10 +44,19 @@ design must leave room for all three (see "Seams").
 - Keep a config toggle `hyprland.dispatch = "auto" | "lua" | "legacy"`. `auto` probes with `hl.dsp.no_op()` once.
   `legacy` emits `dispatch focuswindow address:0x…` / `dispatch exec [workspace 3 silent] cmd`.
 
+- **Verified in a real VM (`nix build .#checks.x86_64-linux.vm-hyprland`)**: `hl.dsp.no_op()` → `ok`;
+  `hl.dsp.exec_cmd("kitty --class probe", { workspace = "2" })` → window on ws 2 with class `probe`;
+  `hl.dsp.focus({ window = "address:0x…" })` and `{ window = "class:^probe$" }` work;
+  `hl.dsp.window.close({ window = "class:^x$" })` works. Real socket2 lines look like:
+  `openwindow>>5f20cb695640,2,probe3,kitty`, `activewindowv2>>5f20cb695640`, `closewindow>>5f20cb695640`,
+  `windowtitlev2>>5f20cb695640,alice@machine: ~` (plus legacy `activewindow>>class,title`, `windowtitle>>addr`).
+- Under load `hyprctl` can fail with exit 6 "Hyprland IPC didn't respond in time" — treat as retryable.
+
 ### kitty (0.49) remote control
 - Standalone per-agent instance (**default mode**):
   `kitty --class drove-<id> --title <name> --directory <cwd> --listen-on unix:<runtime>/drove/kitty-<id>.sock -o allow_remote_control=socket-only env DROVE_AGENT_ID=<id> DROVE_SOCKET=<sock> <agent argv…>`
-  → Hyprland sees app id / class `drove-<id>`. Control it with `kitten @ --to unix:<that sock> …` (single window, no `--match` needed).
+  → Hyprland sees app id / class `drove-<id>`. **Also pass `-o confirm_os_window_close=0`**: otherwise kitty shows a
+  confirmation when asked to close (verified: `hl.dsp.window.close` returns `ok` but the window stays open). Control it with `kitten @ --to unix:<that sock> …` (single window, no `--match` needed).
 - Shared-instance mode (optional config): `kitten @ --to <user sock> launch --type=os-window --os-window-class drove-<id> --os-window-title <name> --cwd <cwd> --var drove_id=<id> --env DROVE_AGENT_ID=<id> -- <argv>` prints the new kitty window id; later calls use `--match id:<n>`.
 - `kitten @ ls` JSON: os windows → tabs → windows with `id, pid, cwd, cmdline, title, env, user_vars, foreground_processes, at_prompt, needs_attention, has_activity_since_last_focus, is_focused …`.
 - `kitten @ send-text [--match …] -- text`, `kitten @ get-text [--match …] --extent screen|all|last_cmd_output`.
@@ -153,7 +162,15 @@ agent hooks ──► drove hook <src> ──(unix socket, fire-and-forget)─�
    - a fake socket2 (test binds the unix socket and writes `openwindow>>…` lines),
    - fake `kitty`/`kitten` scripts.
    Then: spawn → assert exec_cmd dispatched with `drove-<id>` → write openwindow → run `drove hook claude` with fixture stdin + `DROVE_AGENT_ID` → assert `ls --json` statuses → activewindowv2 clears attention → closewindow → Exited.
-3. A real headless Hyprland + kitty environment via Nix is being prepared separately (`flake.nix` / `tests/headless/`); don't block on it.
+3. **Real Hyprland + kitty VM tests via Nix** (`flake.nix`, `nix/`; see `nix/README.md`):
+   - `checks.vm-hyprland` — passes today; pins down the IPC facts above.
+   - `checks.vm-drove` — the end-to-end **acceptance test** for this plan, written against the CLI surface
+     described here (`drove daemon|status|spawn|ls --json|send --enter|next|focus|text|close|forget --exited|hooks install`).
+     Fake `claude`/`codex`/`kiro-cli` scripts (`nix/fake-agents.nix`) discover hooks exactly like the real CLIs and fire
+     real payloads. If you change a CLI detail, update `nix/vm-drove.nix` in the same commit.
+     Expectations it encodes: `spawn` prints the id as the last token; `ls --json` is an array (or `{agents:[…]}`) of
+     objects with `id, status, attention, window, cwd`; status strings compare case/underscore-insensitively
+     (`needs_input` == `NeedsInput`); `status` output mentions `lua` when Lua dispatch was detected.
 
 ## Conventions
 - `cargo fmt`, `cargo clippy -- -D warnings`, `cargo test` must pass before every commit.
